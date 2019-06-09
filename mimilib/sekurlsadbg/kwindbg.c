@@ -7,9 +7,9 @@
 
 WINDBG_EXTENSION_APIS ExtensionApis = {0};
 EXT_API_VERSION g_ExtApiVersion = {5 , 5 ,
-#ifdef _M_X64
+#if defined(_M_X64) || defined(_M_ARM64) // TODO:ARM64
 	EXT_API_VERSION_NUMBER64
-#elif defined _M_IX86
+#elif defined(_M_IX86)
 	EXT_API_VERSION_NUMBER32
 #endif
 , 0};
@@ -122,7 +122,7 @@ DECLARE_API(kdbg_mimikatz)
 			kuhl_m_sekurlsa_krbtgt_keys(dualKrbtgt.krbtgt_previous, "Previous");
 		}
 	}
-#ifdef _M_X64
+#if defined(_M_X64)
 	if(pDomainList = GetExpression("kdcsvc!KdcDomainList"))
 	{
 		dprintf("\nDomain List\n===========\n");
@@ -216,7 +216,7 @@ DECLARE_API(kdbg_mimikatz)
 				}
 				else dprintf("[ERROR] [LSA] Symbols\n%p - lsasrv!LogonSessionListCount\n%p - lsasrv!LogonSessionList\n", pLogonSessionListCount, pLogonSessionList);
 			}
-			else dprintf("[ERROR] [CRYPTO] Acquire keys");
+			else dprintf("[ERROR] [CRYPTO] Acquire keys\n");
 		}
 		else dprintf("[ERROR] [CRYPTO] Symbols\n%p - lsasrv!InitializationVector\n%p - lsasrv!hAesKey\n%p - lsasrv!h3DesKey\n", pInitializationVector, phAesKey, ph3DesKey);
 		kuhl_m_sekurlsa_nt6_LsaCleanupProtectedMemory();
@@ -558,7 +558,7 @@ void kuhl_m_sekurlsa_krbtgt_keys(PVOID addr, LPCSTR prefix)
 	}
 }
 
-#ifdef _M_X64
+#if defined(_M_X64)
 void kuhl_m_sekurlsa_krbtgt_trust(ULONG_PTR addr)
 {
 	ULONG_PTR buffer;

